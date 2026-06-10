@@ -1,0 +1,27 @@
+[
+  {
+    "id": "filesystem-proxy",
+    "name": "filesystem-proxy",
+    "image": "ghcr.io/example/filesystem-proxy",
+    "tag": "1.0.0",
+    "command": ["node", "index.js"],
+    "env": {
+      "MODE": "readonly"
+    },
+    "auth": "none",
+    "scope": ["read"],
+    "network": ["egress"],
+    "filesystem": ["tmp"]
+  },
+  {
+    "id": "git-ops",
+    "name": "git-ops",
+    "image": "ghcr.io/example/git-ops",
+    "tag": "2.0.0",
+    "command": "python -m app",
+    "auth": "token",
+    "scope": ["read", "write"],
+    "network": ["egress"],
+    "filesystem": ["repo"]
+  }
+]

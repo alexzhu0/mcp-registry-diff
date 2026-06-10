@@ -1,0 +1,30 @@
+name: mcp-registry-diff
+one_liner: Compare MCP registry snapshots, normalize common formats, and detect risky server changes.
+target_user: MCP operators and agent engineers
+pain_point: Registry drift across image, auth, and access fields is hard to review manually.
+demo_command: PYTHONPATH=src python3 -m mcp_registry_diff examples/registry-old.json examples/registry-new.json --format markdown --fail-on none
+tier: flagship
+maturity_status: trend-aligned-2026-06-10
+next_release: v0.1.0
+polish_score: 91
+topics:
+  - ai-tools
+  - mcp
+  - agents
+  - cli
+  - developer-tools
+  - ops
+release_channel:
+  - github
+  - relevant-developer-communities
+launch_copy:
+  - I built mcp-registry-diff to compare MCP registries across risky fields before rollout.
+  - Registry formats vary by source; this CLI normalizes list, server-list, and keyed-object registries first.
+  - Try it with: PYTHONPATH=src python3 -m mcp_registry_diff examples/registry-old.json examples/registry-new.json --format markdown
+quality_gate:
+  commands:
+    - python3 -m unittest discover -s tests
+metrics_goal:
+  day_1_stars: 5
+  day_3_stars: 15
+  day_7_stars: 50

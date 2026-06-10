@@ -1,0 +1,31 @@
+{
+  "servers": [
+    {
+      "id": "filesystem-proxy",
+      "name": "filesystem-proxy",
+      "image": "ghcr.io/example/filesystem-proxy",
+      "tag": "1.1.0",
+      "command": ["node", "index.js", "--watch"],
+      "env": {
+        "MODE": "read-write",
+        "LOG_LEVEL": "info"
+      },
+      "auth": "none",
+      "scope": ["read", "write"],
+      "network": ["egress", "intra"],
+      "filesystem": ["tmp", "home"]
+    },
+    {
+      "id": "db-sync",
+      "name": "db-sync",
+      "image": "ghcr.io/example/db-sync",
+      "tag": "0.9.0",
+      "command": ["python", "-m", "db_sync"],
+      "env": ["DB_URL=postgres://db", "MODE=rw"],
+      "auth": "oauth",
+      "scope": ["write"],
+      "network": ["db", "egress"],
+      "filesystem": []
+    }
+  ]
+}

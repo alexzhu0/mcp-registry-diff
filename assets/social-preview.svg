@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <rect width="1280" height="640" fill="#0f172a"/>
+  <rect x="40" y="40" width="1200" height="560" rx="20" fill="#1e293b"/>
+  <text x="640" y="220" text-anchor="middle" fill="#f8fafc" font-family="Arial" font-size="66" font-weight="700">mcp-registry-diff</text>
+  <text x="640" y="320" text-anchor="middle" fill="#93c5fd" font-family="Arial" font-size="40">Compare MCP registries before rollout</text>
+  <text x="640" y="390" text-anchor="middle" fill="#e2e8f0" font-family="Arial" font-size="34">image - tag - command - env - auth - scope - network - filesystem</text>
+  <text x="640" y="500" text-anchor="middle" fill="#cbd5e1" font-family="Arial" font-size="30">Markdown + JSON diff outputs with risk-change gating.</text>
+</svg>
