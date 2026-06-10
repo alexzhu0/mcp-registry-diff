@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
@@ -13,6 +14,7 @@ RISK_FIELDS = ("auth", "scope", "network", "filesystem")
 LIST_KEYS = ("servers", "items", "repositories", "mcpServers")
 ID_FIELDS = ("id", "slug", "package", "title", "full_name")
 NAME_FIELDS = ("name", "title", "id", "slug", "package", "full_name")
+SERVER_HINT_FIELDS = set(ID_FIELDS + NAME_FIELDS + TRACKED_FIELDS)
 FIELD_ALIASES = {
     "auth": ("auth", "authentication", "authorization"),
     "scope": ("scope", "scopes", "permissions"),
@@ -20,6 +22,12 @@ FIELD_ALIASES = {
     "filesystem": ("filesystem", "files", "filesystemAccess", "filesystem_access"),
     "image": ("image", "docker_image", "container_image"),
 }
+
+
+def _looks_like_server_record(record: Dict[str, Any]) -> bool:
+    if SERVER_HINT_FIELDS & set(record):
+        return True
+    return any(alias in record for aliases in FIELD_ALIASES.values() for alias in aliases)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -36,7 +44,7 @@ def _read_json(path: str) -> Any:
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
-def _first_field(record: Dict[str, Any], keys: Iterable[str], default: Optional[str] = None) -> Optional[str]:
+def _first_field(record: Dict[str, Any], keys: Iterable[str], default: Optional[str] = None) -> Any:
     for key in keys:
         value = record.get(key)
         if value is None:
@@ -44,7 +52,7 @@ def _first_field(record: Dict[str, Any], keys: Iterable[str], default: Optional[
         if isinstance(value, str) and value.strip():
             return value.strip()
         if not isinstance(value, str):
-            return str(value)
+            return value
     return default
 
 
@@ -60,15 +68,25 @@ def _listify_servers(payload: Any) -> List[Dict[str, Any]]:
         if isinstance(value, list):
             return [item for item in value if isinstance(item, dict)]
 
-    # Object keyed by id/name:
-    if all(isinstance(value, dict) for value in payload.values()):
+    # Object keyed by id/name, possibly mixed with metadata fields.
+    keyed_servers = []
+    for server_id, server_data in payload.items():
+        if str(server_id).startswith("_") or not isinstance(server_data, dict):
+            continue
+        if not _looks_like_server_record(server_data):
+            continue
+        data = dict(server_data)
+        data["id"] = data.get("id") or server_id
+        keyed_servers.append(data)
+    if keyed_servers:
+        return keyed_servers
+
+    # Single server object.
+    if _looks_like_server_record(payload):
         result = []
-        for server_id, server_data in payload.items():
-            if server_id.startswith("_"):
-                continue
-            data = dict(server_data)
-            data["id"] = data.get("id") or server_id
-            result.append(data)
+        data = dict(payload)
+        data["id"] = data.get("id") or data.get("name") or "server-0"
+        result.append(data)
         return result
 
     return []
@@ -332,13 +350,20 @@ def should_fail(diff: Dict[str, Any], mode: str) -> bool:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    diff = compare_registries(args.old_registry, args.new_registry)
-    output = run(args.old_registry, args.new_registry, args.format, args.fail_on)
-    if args.output:
-        Path(args.output).write_text(output, encoding="utf-8")
-    else:
-        print(output)
-    return 1 if should_fail(diff, args.fail_on) else 0
+    try:
+        diff = compare_registries(args.old_registry, args.new_registry)
+        if args.format == "json":
+            output = _format_json_payload(args.old_registry, args.new_registry, diff, args.fail_on)
+        else:
+            output = format_markdown(args.old_registry, args.new_registry, diff)
+        if args.output:
+            Path(args.output).write_text(output, encoding="utf-8")
+        else:
+            print(output)
+        return 1 if should_fail(diff, args.fail_on) else 0
+    except (FileNotFoundError, json.JSONDecodeError, OSError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":

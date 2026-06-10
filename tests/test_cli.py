@@ -3,7 +3,7 @@ import tempfile
 from pathlib import Path
 import unittest
 from io import StringIO
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 
 from mcp_registry_diff.cli import (
     _first_field,
@@ -53,6 +53,22 @@ class RegistryDiffTests(unittest.TestCase):
             old_path = self._write_json(tmp, "old.json", {"key-one": {"name": "Key One", "image": "python:3.12"}})
             old = normalize_registry(old_path)
         self.assertIn("key-one", old)
+        self.assertEqual(old["key-one"]["image"], "python:3.12")
+
+    def test_normalize_keyed_object_with_metadata(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            old_path = self._write_json(
+                tmp,
+                "old.json",
+                {
+                    "_metadata": {"version": "1"},
+                    "generated_at": "2026-06-10",
+                    "key-one": {"name": "Key One", "image": "python:3.12"},
+                },
+            )
+            old = normalize_registry(old_path)
+        self.assertEqual(list(old), ["key-one"])
         self.assertEqual(old["key-one"]["image"], "python:3.12")
 
     def test_detects_added_and_removed_servers(self):
@@ -112,6 +128,26 @@ class RegistryDiffTests(unittest.TestCase):
             {"image", "tag", "command", "env", "auth", "scope", "network", "filesystem"},
         )
 
+    def test_normalize_alias_list_values_without_stringifying_nested_list(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            registry_path = self._write_json(
+                tmp,
+                "registry.json",
+                [
+                    {
+                        "id": "s1",
+                        "permissions": ["read", "write"],
+                        "networkAccess": ["egress"],
+                        "filesystemAccess": ["tmp", "home"],
+                    }
+                ],
+            )
+            registry = normalize_registry(registry_path)
+        self.assertEqual(registry["s1"]["scope"], ["read", "write"])
+        self.assertEqual(registry["s1"]["network"], ["egress"])
+        self.assertEqual(registry["s1"]["filesystem"], ["home", "tmp"])
+
     def test_markdown_output(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp = Path(tmpdir)
@@ -169,6 +205,23 @@ class RegistryDiffTests(unittest.TestCase):
             self.assertEqual(code, 1)
             self.assertEqual(stdout.getvalue(), "")
             self.assertIn("Changed", output_path.read_text(encoding="utf-8"))
+
+    def test_main_reports_malformed_json_without_traceback(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            old_path = tmp / "old.json"
+            new_path = self._write_json(tmp, "new.json", [{"id": "s1"}])
+            old_path.write_text("{not json", encoding="utf-8")
+            stdout = StringIO()
+            stderr = StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                from mcp_registry_diff.cli import main
+
+                code = main([str(old_path), new_path])
+            self.assertEqual(code, 2)
+            self.assertEqual(stdout.getvalue(), "")
+            self.assertIn("error:", stderr.getvalue())
+            self.assertNotIn("Traceback", stderr.getvalue())
 
 
 if __name__ == "__main__":
